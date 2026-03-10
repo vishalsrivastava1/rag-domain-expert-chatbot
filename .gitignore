@@ -3,4 +3,7 @@ venv/
 __pycache__/
 .env
 *.pyc
-data/chroma
+data/chroma/
+chroma_db/
+.DS_Store
+data/raw/
