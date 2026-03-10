@@ -9,6 +9,7 @@ from sentence_transformers import SentenceTransformer
 CHROMA_DIR  = Path("chroma_db")
 COLLECTION  = "nasa_docs"
 EMBED_MODEL = "all-MiniLM-L6-v2"
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -99,19 +100,22 @@ class HybridRetriever:
             include=["documents", "metadatas", "distances"],
         )
         sem_ranking = [
-            (sid, 1.0 - dist)
-            for sid, dist in zip(sem["ids"][0], sem["distances"][0])
-        ]
+            sid for sid in sem["ids"][0]
+      ]
 
         # 3. Reciprocal Rank Fusion (RRF)
         scores = defaultdict(float)
+
         for rank, (doc_id, _) in enumerate(bm25_results, 1):
             scores[doc_id] += 1.0 / (self.rrf_k + rank)
-        for rank, (doc_id, _) in enumerate(sem_ranking, 1):
+
+        for rank, doc_id in enumerate(sem_ranking, 1):
             scores[doc_id] += 1.0 / (self.rrf_k + rank)
+
         top_ids = sorted(scores, key=lambda x: scores[x], reverse=True)[:k]
 
-        if not top_ids: return []
+        if not top_ids:
+            return []
 
         # 4. Fetch full data for top results
         fetched = self.collection.get(
@@ -146,3 +150,19 @@ def get_retriever() -> HybridRetriever:
     if _retriever is None:
         _retriever = HybridRetriever()
     return _retriever
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+
+    retriever = get_retriever()
+
+    query = "What is NASA's Artemis program?"
+    results = retriever.retrieve(query, top_k=5)
+
+    for i, r in enumerate(results, 1):
+        print(f"\nResult {i}")
+        print("Title:", r["title"])
+        print("Source:", r["source"])
+        print("Page:", r["page"])
+        print("Score:", r["score"])
+        print("Text preview:", r["text"][:200])
